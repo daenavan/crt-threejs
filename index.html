@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>CRT Shader Three.js</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+      }
+      canvas {
+        display: block;
+      }
+      .ui-controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+        display: flex;
+        gap: 10px;
+      }
+      #image-picker,
+      #download-btn,
+      #hide-controls-btn {
+        background-color: #2c2c2c;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        border: 1px solid #555;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-size: 14px;
+        transition: opacity 0.3s ease;
+      }
+
+      /* Styles for when controls are hidden */
+      .ui-controls.hidden #image-picker,
+      .ui-controls.hidden #download-btn {
+        display: none;
+      }
+      .ui-controls.hidden #hide-controls-btn {
+        opacity: 0.1; /* Make the hide button very faint */
+      }
+      .ui-controls.hidden #hide-controls-btn:hover {
+        opacity: 1; /* Make it fully visible on hover */
+      }
+      .lil-gui.hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ui-controls">
+      <button id="hide-controls-btn">Hide</button>
+      <input
+        type="file"
+        id="image-picker"
+        accept="image/png, image/jpeg, image/gif"
+      />
+      <button id="download-btn">Download</button>
+    </div>
+
+    <!-- SHADER CODE -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+      varying vec2 vUv;
+      void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D u_texture;
+      uniform float u_time;
+      uniform vec2 u_resolution;
+      uniform vec2 u_image_resolution;
+      uniform float u_curvature;
+      uniform float u_scanline_thickness;
+      uniform float u_scanline_brightness;
+      uniform float u_vignette_darkness;
+      uniform float u_chromatic_aberration;
+      uniform float u_noise_amount;
+      uniform float u_flicker_amount;
+
+      vec2 distort(vec2 uv) {
+          float barrel_power = u_curvature;
+          float r2 = (uv.x - 0.5) * (uv.x - 0.5) + (uv.y - 0.5) * (uv.y - 0.5);
+          float f = 1.0 + r2 * barrel_power;
+          return f * (uv - 0.5) + 0.5;
+      }
+
+      float rand(vec2 co){
+          return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+      }
+
+      void main() {
+          vec2 aspect_corrected_uv = vUv;
+          float screen_aspect = u_resolution.x / u_resolution.y;
+          float image_aspect = u_image_resolution.x / u_image_resolution.y;
+
+          if (screen_aspect > image_aspect) {
+              aspect_corrected_uv.x = (vUv.x - 0.5) * (screen_aspect / image_aspect) + 0.5;
+          } else {
+              aspect_corrected_uv.y = (vUv.y - 0.5) * (image_aspect / screen_aspect) + 0.5;
+          }
+
+          if (aspect_corrected_uv.x < 0.0 || aspect_corrected_uv.x > 1.0 || aspect_corrected_uv.y < 0.0 || aspect_corrected_uv.y > 1.0) {
+              gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+              return;
+          }
+
+          vec2 distorted_uv = distort(aspect_corrected_uv);
+          vec2 R_uv = distort(aspect_corrected_uv - vec2(u_chromatic_aberration, 0.0));
+          vec2 G_uv = distorted_uv;
+          vec2 B_uv = distort(aspect_corrected_uv + vec2(u_chromatic_aberration, 0.0));
+
+          float r = texture2D(u_texture, R_uv).r;
+          float g = texture2D(u_texture, G_uv).g;
+          float b = texture2D(u_texture, B_uv).b;
+          vec4 color = vec4(r, g, b, 1.0);
+
+          float scanline = sin(distorted_uv.y * u_resolution.y * u_scanline_thickness) * u_scanline_brightness + (1.0 - u_scanline_brightness);
+          color.rgb *= scanline;
+          float vignette = (1.0 - length(distorted_uv - 0.5) * u_vignette_darkness);
+          color.rgb *= vignette;
+          float noise = rand(vUv + u_time) * u_noise_amount;
+          color.rgb += noise;
+          float flicker = (sin(u_time * 20.0) * 0.5 + 0.5) * u_flicker_amount + (1.0 - u_flicker_amount);
+          color.rgb *= flicker;
+
+          if (distorted_uv.x < 0.0 || distorted_uv.x > 1.0 || distorted_uv.y < 0.0 || distorted_uv.y > 1.0) {
+              gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+          } else {
+              gl_FragColor = color;
+          }
+      }
+    </script>
+
+    <!-- JAVASCRIPT LIBRARIES -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.umd.min.js"></script>
+
+    <!-- MAIN APPLICATION SCRIPT -->
+    <script>
+      let scene, camera, renderer, plane, material;
+
+      const settings = {
+        curvature: 0.4,
+        scanlineThickness: 1.2,
+        scanlineBrightness: 0.5,
+        vignetteDarkness: 1.0,
+        chromaticAberration: 0.004,
+        noiseAmount: 0.04,
+        flickerAmount: 0.01,
+      };
+
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const textureLoader = new THREE.TextureLoader();
+
+        const width = 1,
+          height = 1;
+        const data = new Uint8Array([128, 128, 128, 255]);
+        const initialTexture = new THREE.DataTexture(data, width, height);
+        initialTexture.needsUpdate = true;
+
+        material = new THREE.ShaderMaterial({
+          uniforms: {
+            u_texture: { value: initialTexture },
+            u_time: { value: 0.0 },
+            u_resolution: {
+              value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+            },
+            u_image_resolution: { value: new THREE.Vector2(width, height) },
+            u_curvature: { value: settings.curvature },
+            u_scanline_thickness: { value: settings.scanlineThickness },
+            u_scanline_brightness: { value: settings.scanlineBrightness },
+            u_vignette_darkness: { value: settings.vignetteDarkness },
+            u_chromatic_aberration: { value: settings.chromaticAberration },
+            u_noise_amount: { value: settings.noiseAmount },
+            u_flicker_amount: { value: settings.flickerAmount },
+          },
+          vertexShader: document.getElementById("vertexShader").textContent,
+          fragmentShader: document.getElementById("fragmentShader").textContent,
+        });
+
+        const geometry = new THREE.PlaneBufferGeometry(2, 2);
+        plane = new THREE.Mesh(geometry, material);
+        scene.add(plane);
+
+        // --- UI Element Handling ---
+        const fileInput = document.getElementById("image-picker");
+        const downloadBtn = document.getElementById("download-btn");
+        const hideControlsBtn = document.getElementById("hide-controls-btn");
+        const uiControlsContainer = document.querySelector(".ui-controls");
+        let currentObjectUrl = null;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+          }
+          currentObjectUrl = URL.createObjectURL(file);
+
+          textureLoader.load(currentObjectUrl, (newTexture) => {
+            material.uniforms.u_texture.value = newTexture;
+            material.uniforms.u_image_resolution.value.x =
+              newTexture.image.width;
+            material.uniforms.u_image_resolution.value.y =
+              newTexture.image.height;
+            material.needsUpdate = true;
+          });
+        });
+
+        downloadBtn.addEventListener("click", downloadCanvasAsImage);
+
+        const gui = new lil.GUI();
+        gui
+          .add(settings, "curvature", 0, 2, 0.01)
+          .name("Curvature")
+          .onChange((v) => (material.uniforms.u_curvature.value = v));
+        gui
+          .add(settings, "scanlineThickness", 0, 4, 0.1)
+          .name("Scanline Thickness")
+          .onChange((v) => (material.uniforms.u_scanline_thickness.value = v));
+        gui
+          .add(settings, "scanlineBrightness", 0, 1, 0.01)
+          .name("Scanline Brightness")
+          .onChange((v) => (material.uniforms.u_scanline_brightness.value = v));
+        gui
+          .add(settings, "vignetteDarkness", 0, 2, 0.05)
+          .name("Vignette")
+          .onChange((v) => (material.uniforms.u_vignette_darkness.value = v));
+        gui
+          .add(settings, "chromaticAberration", 0, 0.02, 0.0001)
+          .name("Chromatic Aberration")
+          .onChange(
+            (v) => (material.uniforms.u_chromatic_aberration.value = v)
+          );
+        gui
+          .add(settings, "noiseAmount", 0, 0.2, 0.001)
+          .name("Noise")
+          .onChange((v) => (material.uniforms.u_noise_amount.value = v));
+        gui
+          .add(settings, "flickerAmount", 0, 0.1, 0.001)
+          .name("Flicker")
+          .onChange((v) => (material.uniforms.u_flicker_amount.value = v));
+
+        // --- Hide/Show Logic ---
+        let areControlsHidden = false;
+        hideControlsBtn.addEventListener("click", () => {
+          areControlsHidden = !areControlsHidden; // Toggle the state
+          uiControlsContainer.classList.toggle("hidden", areControlsHidden);
+          gui.domElement.classList.toggle("hidden", areControlsHidden);
+          hideControlsBtn.textContent = areControlsHidden ? "Show" : "Hide";
+        });
+
+        window.addEventListener("resize", onWindowResize, false);
+        animate();
+      }
+
+      function onWindowResize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        material.uniforms.u_resolution.value.x = window.innerWidth;
+        material.uniforms.u_resolution.value.y = window.innerHeight;
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        material.uniforms.u_time.value += 0.01;
+        renderer.render(scene, camera);
+      }
+
+      function downloadCanvasAsImage() {
+        renderer.render(scene, camera);
+        const link = document.createElement("a");
+        link.download = "crt-shader-output.png";
+        link.href = renderer.domElement.toDataURL("image/png");
+        link.click();
+      }
+
+      init();
+    </script>
+  </body>
+</html>
