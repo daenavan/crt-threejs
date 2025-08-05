@@ -1,7 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>CRT Shader Three.js</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary Meta Tags -->
+    <title>
+      CRT Shader Effect - Interactive Retro Monitor Simulation | Three.js WebGL
+    </title>
+    <meta
+      name="title"
+      content="CRT Shader Effect - Interactive Retro Monitor Simulation | Three.js WebGL"
+    />
+    <meta
+      name="description"
+      content="Transform any image into a nostalgic CRT monitor display with real-time adjustable scanlines, barrel distortion, chromatic aberration, and vintage effects. Built with Three.js and custom GLSL shaders."
+    />
+    <meta
+      name="keywords"
+      content="CRT shader, Three.js, WebGL, GLSL, retro effects, vintage monitor, scanlines, chromatic aberration, barrel distortion, image filter, nostalgia, 80s computer"
+    />
+    <meta name="author" content="daenavan" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://daenavan.github.io/crt-threejs/" />
+    <meta
+      property="og:title"
+      content="CRT Shader Effect - Interactive Retro Monitor Simulation"
+    />
+    <meta
+      property="og:description"
+      content="Transform any image into a nostalgic CRT monitor display with real-time adjustable scanlines, barrel distortion, chromatic aberration, and vintage effects."
+    />
+    <meta
+      property="og:image"
+      content="https://daenavan.github.io/crt-threejs/preview.jpg"
+    />
+    <meta property="og:site_name" content="CRT Shader Three.js" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta
+      property="twitter:url"
+      content="https://daenavan.github.io/crt-threejs/"
+    />
+    <meta
+      property="twitter:title"
+      content="CRT Shader Effect - Interactive Retro Monitor Simulation"
+    />
+    <meta
+      property="twitter:description"
+      content="Transform any image into a nostalgic CRT monitor display with real-time adjustable vintage effects."
+    />
+    <meta
+      property="twitter:image"
+      content="https://daenavan.github.io/crt-threejs/preview.jpg"
+    />
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>"
+    />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://daenavan.github.io/crt-threejs/" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "CRT Shader Effect",
+        "description": "Interactive CRT monitor simulation that transforms images with authentic retro effects including scanlines, barrel distortion, and chromatic aberration",
+        "url": "https://daenavan.github.io/crt-threejs/",
+        "author": {
+          "@type": "Person",
+          "name": "daenavan"
+        },
+        "applicationCategory": "WebApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "screenshot": "https://daenavan.github.io/crt-threejs/preview.jpg"
+      }
+    </script>
     <style>
       body {
         margin: 0;
@@ -50,15 +139,32 @@
     </style>
   </head>
   <body>
-    <div class="ui-controls">
-      <button id="hide-controls-btn">Hide</button>
-      <input
-        type="file"
-        id="image-picker"
-        accept="image/png, image/jpeg, image/gif"
-      />
-      <button id="download-btn">Download</button>
-    </div>
+    <!-- Hidden content for SEO -->
+    <header style="position: absolute; left: -9999px">
+      <h1>CRT Shader Effect - Interactive Retro Monitor Simulation</h1>
+      <p>
+        Transform any image into a nostalgic CRT monitor display with real-time
+        adjustable scanlines, barrel distortion, chromatic aberration, and
+        vintage effects. Built with Three.js and custom GLSL shaders.
+      </p>
+    </header>
+
+    <main role="main">
+      <div class="ui-controls" role="toolbar" aria-label="CRT Effect Controls">
+        <button id="hide-controls-btn" aria-label="Toggle controls visibility">
+          Hide
+        </button>
+        <input
+          type="file"
+          id="image-picker"
+          accept="image/png, image/jpeg, image/gif"
+          aria-label="Upload image for CRT effect"
+        />
+        <button id="download-btn" aria-label="Download processed image">
+          Download
+        </button>
+      </div>
+    </main>
 
     <!-- SHADER CODE -->
     <script id="vertexShader" type="x-shader/x-vertex">
@@ -283,7 +389,7 @@
       function downloadCanvasAsImage() {
         renderer.render(scene, camera);
         const link = document.createElement("a");
-        link.download = "crt-shader-output.png";
+        link.download = `crt-shader-output-${Date.now()}.png`;
         link.href = renderer.domElement.toDataURL("image/png");
         link.click();
       }
